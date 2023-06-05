@@ -1,0 +1,13 @@
+{
+    "name": "product-service",
+    "version": "0.1.0",
+    "bin": {
+      "product-service": "bin/product-service.js"
+    },
+    "scripts": {
+      "cdk-deploy": "cd product-service && npm run deploy"
+    },
+    "devDependencies": {},
+    "dependencies": {}
+  }
+  
