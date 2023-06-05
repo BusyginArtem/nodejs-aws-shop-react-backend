@@ -13,7 +13,9 @@ export const handler = async ({
     const productId = pathParameters?.productId;
 
     if (!productId) {
-      return buildResponse(404, "Product not found!");
+      return buildResponse(404, {
+        message: "Product not found!"
+      });
     }
 
     const product: Product | undefined = products.find(
@@ -21,7 +23,9 @@ export const handler = async ({
     );
 
     if (!product) {
-      return buildResponse(404, "Product not found!");
+      return buildResponse(404, {
+        message: "Product not found!"
+      });
     }
 
     return buildResponse(200, product);

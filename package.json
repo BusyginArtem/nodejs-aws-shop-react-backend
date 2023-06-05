@@ -5,7 +5,8 @@
       "product-service": "bin/product-service.js"
     },
     "scripts": {
-      "cdk-deploy": "cd product-service && npm run deploy"
+      "cdk-deploy": "cd product-service && npm run deploy",
+      "test": "cd product-service && npm run test"
     },
     "devDependencies": {},
     "dependencies": {}

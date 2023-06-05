@@ -1,17 +1,34 @@
-// import * as cdk from 'aws-cdk-lib';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as ProductService from '../lib/product-service-stack';
+import { handler as getProductList } from "../resources/lambdas/getProductList";
+import { handler as getProductById } from "../resources/lambdas/getProductById";
+import { products } from "../resources/lambdas/mock";
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/product-service-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new ProductService.ProductServiceStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+describe('get product list', () => {
+  test('return an array of products', async () => {
+    const result = await getProductList();
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+    expect(result.statusCode).toBe(200);
+    expect(Array.isArray(JSON.parse(result.body))).toBe(true);
+  });
+});
+
+describe('get product by id', () => {
+  test('return a product from the list', async () => {
+    const product = products[0];
+
+    const result = await getProductById({
+        pathParameters: { productId: product.id }
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body).title).toBe(product.title);
+  });
+
+  test('product not found', async () => {
+    const result = await getProductById({
+        pathParameters: { productId: "1" }
+    });
+
+    expect(result.statusCode).toBe(404);
+    expect(JSON.parse(result.body).message).toBe('Product not found!');
+  });
 });
