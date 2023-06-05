@@ -1,4 +1,4 @@
-import { HTTPStatusCode, ResponseSchema } from "../interfaces";
+import { HTTPStatusCode, ResponseSchema } from "../../../interfaces";
 
 export const buildResponse = (
   statusCode: HTTPStatusCode,

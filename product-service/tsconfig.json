@@ -22,10 +22,15 @@
     "strictPropertyInitialization": false,
     "typeRoots": [
       "./node_modules/@types"
-    ]
+    ],
+    "baseUrl": "./",
+    "paths": {
+      "/opt/mock/nodejs": ["./resources/layers/mock/nodejs/mock"],
+      "/opt/utils/nodejs": ["./resources/layers/utils/nodejs/utils"]
+    }
   },
   "exclude": [
     "node_modules",
     "cdk.out"
-  ]
+  ],
 }

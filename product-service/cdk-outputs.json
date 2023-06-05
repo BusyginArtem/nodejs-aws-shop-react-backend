@@ -1,6 +1,6 @@
 {
   "ProductServiceStack": {
-    "path": "C:\\Users\\User\\Learning\\rs-school\\nodejs-aws-shop-react-backend\\product-service\\resources\\handlers",
+    "mockUrl": "C:\\Users\\User\\Learning\\rs-school\\nodejs-aws-shop-react-backend\\product-service\\resources\\layers\\mock",
     "apiUrl": "https://ob7a34744h.execute-api.eu-west-1.amazonaws.com/dev/",
     "ProductApiEndpoint760E02C8": "https://ob7a34744h.execute-api.eu-west-1.amazonaws.com/dev/"
   }

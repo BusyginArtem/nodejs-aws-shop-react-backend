@@ -9,7 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "deploy": "npx aws-cdk deploy --profile=admin --require-approval=never --outputs-file ./cdk-outputs.json"
+    "deploy": "npm install && npm run build && npx aws-cdk deploy --profile=admin --require-approval=never --outputs-file ./cdk-outputs.json"
   },
   "devDependencies": {
     "@types/jest": "^29.5.1",

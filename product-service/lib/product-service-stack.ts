@@ -31,25 +31,45 @@ export class ProductServiceStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
-    new cdk.CfnOutput(this, "path", { value: path.join(__dirname, "../resources/handlers") });
 
+    // Lambda layers
+    // const productDataLayer = new lambda.LayerVersion(
+    //   this,
+    //   "product-data-layer",
+    //   {
+    //     code: lambda.Code.fromAsset(path.join(__dirname, "..", "resources", "layers", "mock")),
+    //     description: "mocked-products",
+    //     compatibleRuntimes: [lambda.Runtime.NODEJS_18_X],
+    //   }
+    // );
+
+    // const utilsLayer = new lambda.LayerVersion(this, "utils-layer", {
+    //   code: lambda.Code.fromAsset(path.join(__dirname, "..", "resources", "layers", "utils")),
+    //   description: "utils",
+    //   compatibleRuntimes: [lambda.Runtime.NODEJS_18_X],
+    // });
+
+    // Lambdas
     const getProductsLambda = new lambda.Function(this, "get-products-lambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductList.handler",
       code: lambda.Code.fromAsset(
-        path.join(__dirname, "../resources/handlers")
+        path.join(__dirname, "..", "resources", "lambdas")
       ),
+      // layers: [productDataLayer, utilsLayer],
     });
 
     const getProductLambda = new lambda.Function(this, "get-product-lambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductById.handler",
       code: lambda.Code.fromAsset(
-        path.join(__dirname, "../resources/handlers")
+        path.join(__dirname, "..", "resources", "lambdas")
       ),
+      // layers: [productDataLayer, utilsLayer],
     });
 
-    // 👇 add /products resources
+    // Routes
+    // 👇 add /products and /products/:id resources
     const products = api.root.addResource("products");
     const product = products.addResource("{productId}");
 

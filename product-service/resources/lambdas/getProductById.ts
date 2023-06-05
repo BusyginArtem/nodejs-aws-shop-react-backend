@@ -1,4 +1,8 @@
-import { Product, ResponseSchema } from "../interfaces";
+// /* eslint-disable import/extensions, import/no-absolute-path */
+// import { products } from "/opt/mock/nodejs";
+// /* eslint-disable import/extensions, import/no-absolute-path */
+// import { buildResponse } from "/opt/utils/nodejs";
+import { Product, ResponseSchema } from "./interfaces";
 import { products } from "./mock";
 import { buildResponse } from "./utils";
 
