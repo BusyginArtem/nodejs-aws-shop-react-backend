@@ -1,14 +1,15 @@
 {
-  "name": "product-service",
-  "version": "0.1.0",
-  "bin": {
-    "product-service": "bin/product-service.js"
-  },
-  "scripts": {
-    "deploy:product-service": "cd product-service && npm run deploy",
-    "deploy:db-service": "cd db-service && npm run deploy",
-    "test:product-service": "cd product-service && npm run test"
-  },
-  "devDependencies": {},
-  "dependencies": {}
-}
+    "name": "product-service",
+    "version": "0.1.0",
+    "bin": {
+      "product-service": "bin/product-service.js"
+    },
+    "scripts": {
+      "deploy:product-service": "cd product-service && npm run deploy",
+      "deploy:db-service": "cd db-service && npm run deploy",
+      "test:product-service": "cd product-service && npm run test"
+    },
+    "devDependencies": {},
+    "dependencies": {}
+  }
+  
