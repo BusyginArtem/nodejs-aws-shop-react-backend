@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.handler = void 0;
+const mock_1 = require("./mock");
+const utils_1 = require("./utils");
+const handler = async () => {
+    try {
+        return (0, utils_1.buildResponse)(200, mock_1.products);
+    }
+    catch (error) {
+        return (0, utils_1.buildResponse)(500, {
+            message: error.message,
+        });
+    }
+};
+exports.handler = handler;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZ2V0UHJvZHVjdExpc3QuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJnZXRQcm9kdWN0TGlzdC50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFLQSxpQ0FBa0M7QUFDbEMsbUNBQXdDO0FBRWpDLE1BQU0sT0FBTyxHQUFHLEtBQUssSUFBNkIsRUFBRTtJQUN6RCxJQUFJO1FBQ0YsT0FBTyxJQUFBLHFCQUFhLEVBQUMsR0FBRyxFQUFFLGVBQVEsQ0FBQyxDQUFDO0tBQ3JDO0lBQUMsT0FBTyxLQUFVLEVBQUU7UUFDbkIsT0FBTyxJQUFBLHFCQUFhLEVBQUMsR0FBRyxFQUFFO1lBQ3hCLE9BQU8sRUFBRSxLQUFLLENBQUMsT0FBTztTQUN2QixDQUFDLENBQUM7S0FDSjtBQUNILENBQUMsQ0FBQztBQVJXLFFBQUEsT0FBTyxXQVFsQiIsInNvdXJjZXNDb250ZW50IjpbIi8vIC8qIGVzbGludC1kaXNhYmxlIGltcG9ydC9leHRlbnNpb25zLCBpbXBvcnQvbm8tYWJzb2x1dGUtcGF0aCAqL1xyXG4vLyBpbXBvcnQgeyBidWlsZFJlc3BvbnNlIH0gZnJvbSBcIi9vcHQvdXRpbHMvbm9kZWpzXCI7XHJcbi8vIC8qIGVzbGludC1kaXNhYmxlIGltcG9ydC9leHRlbnNpb25zLCBpbXBvcnQvbm8tYWJzb2x1dGUtcGF0aCAqL1xyXG4vLyBpbXBvcnQgeyBwcm9kdWN0cyB9IGZyb20gXCIvb3B0L21vY2svbm9kZWpzXCI7XHJcbmltcG9ydCB7IFJlc3BvbnNlU2NoZW1hIH0gZnJvbSBcIi4vaW50ZXJmYWNlc1wiO1xyXG5pbXBvcnQgeyBwcm9kdWN0cyB9IGZyb20gXCIuL21vY2tcIjtcclxuaW1wb3J0IHsgYnVpbGRSZXNwb25zZSB9IGZyb20gXCIuL3V0aWxzXCI7XHJcblxyXG5leHBvcnQgY29uc3QgaGFuZGxlciA9IGFzeW5jICgpOiBQcm9taXNlPFJlc3BvbnNlU2NoZW1hPiA9PiB7XHJcbiAgdHJ5IHtcclxuICAgIHJldHVybiBidWlsZFJlc3BvbnNlKDIwMCwgcHJvZHVjdHMpO1xyXG4gIH0gY2F0Y2ggKGVycm9yOiBhbnkpIHtcclxuICAgIHJldHVybiBidWlsZFJlc3BvbnNlKDUwMCwge1xyXG4gICAgICBtZXNzYWdlOiBlcnJvci5tZXNzYWdlLFxyXG4gICAgfSk7XHJcbiAgfVxyXG59O1xyXG4iXX0=
