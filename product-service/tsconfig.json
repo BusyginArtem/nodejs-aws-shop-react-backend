@@ -20,8 +20,8 @@
     "typeRoots": ["./node_modules/@types"],
     "baseUrl": "./",
     "paths": {
-      "/opt/mock/nodejs": ["./resources/layers/mock/nodejs/mock"],
-      "/opt/utils/nodejs": ["./resources/layers/utils/nodejs/utils"]
+      "/opt/utils": ["./resources/layers/utils/utils"],
+      "/opt/db": ["./resources/layers/db/db"]
     }
   },
   "exclude": ["node_modules", "cdk.out"]

@@ -18,9 +18,5 @@ export type Product = {
   id: string;
   price: number;
   title: string;
+  count?: number;
 };
-
-export type DBItem = {
-  TableName: string,
-  Item: object,
-}
