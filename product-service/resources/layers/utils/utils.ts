@@ -18,9 +18,13 @@ export const buildResponse = (
 export const logRequestArguments = (params: unknown) =>
   console.log("Request arguments:", params);
 
-export const areArgumentsInvalid = (body: Product) =>
-  typeof body !== "object" ||
-  typeof body!.description !== "string" ||
-  typeof body!.price !== "number" ||
-  typeof body!.title !== "string" ||
-  typeof body!.count !== "number";
+export const areArgumentsInvalid = (body: string) => {
+  const { description, price, title, count } = JSON.parse(body);
+
+  return (
+    typeof description !== "string" ||
+    typeof price !== "number" ||
+    typeof title !== "string" ||
+    typeof count !== "number"
+  );
+};

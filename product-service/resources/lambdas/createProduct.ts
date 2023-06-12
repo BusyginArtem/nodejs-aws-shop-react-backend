@@ -14,11 +14,13 @@ export const handler = async (event: any) => {
 
     if (areArgumentsInvalid(event.body)) {
       return buildResponse(400, {
-        message: "Product data is invalid!"
+        message: "Product data is invalid!",
+        event,
+        body: JSON.parse(event.body),
       });
     }
 
-    const { description, price, title, count } = event.body;
+    const { description, price, title, count } = JSON.parse(event.body);
     const id = randomUUID();
 
     const params = {
