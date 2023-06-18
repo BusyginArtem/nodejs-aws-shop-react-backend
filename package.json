@@ -6,8 +6,9 @@
     },
     "scripts": {
       "deploy:product-service": "cd product-service && npm run deploy",
-      "deploy:db-service": "cd db-service && npm run deploy",
+      "deploy:import-service": "cd import-service && npm run deploy",
       "test:product-service": "cd product-service && npm run test",
+      "test:import-service": "cd product-service && npm run test",
       "db:populate": "ts-node ./product-service/db/db-population.ts"
     },
     "devDependencies": {},
