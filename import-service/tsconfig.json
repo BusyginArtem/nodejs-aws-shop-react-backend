@@ -25,6 +25,7 @@
     ],
     "paths": {
       "/opt/utils": ["./resources/layers/utils/utils"],
+      "/opt/csv": ["./resources/layers/csv/csv"],
     }
   },
   "exclude": [

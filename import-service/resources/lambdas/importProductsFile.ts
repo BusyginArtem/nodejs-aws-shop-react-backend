@@ -1,16 +1,24 @@
-import { APIGatewayProxyResult, APIGatewayEvent, Context } from "aws-lambda";
-
+import { APIGatewayProxyResult, APIGatewayEvent, Handler } from "aws-lambda";
+//
 import { buildResponse } from "/opt/utils";
+import { s3Client } from "./s3Client";
 
-export const handler = async (
-  event: APIGatewayEvent,
-  context: Context
+export const handler: Handler = async (
+  event: APIGatewayEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
-    console.log(`Event: ${JSON.stringify(event, null, 2)}`);
-    console.log(`Context: ${JSON.stringify(context, null, 2)}`);
+    const fileName = event.queryStringParameters?.name;
 
-    return buildResponse(201, {});
+    const params = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: `uploaded/${fileName}`,
+      Expires: 60,
+      ContentType: 'text/csv',
+    };
+
+    const response = await s3Client.getSignedUrlPromise('putObject', params);
+
+    return buildResponse(200, response);
   } catch (error: any) {
     return buildResponse(500, {
       message: error.message,

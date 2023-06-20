@@ -1,8 +1,8 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import * as iam from "aws-cdk-lib/aws-iam";
 import * as apiGateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3notifications from "aws-cdk-lib/aws-s3-notifications";
 import * as dotenv from "dotenv";
@@ -28,7 +28,10 @@ export class ImportServiceStack extends cdk.Stack {
         ],
         allowMethods: ["OPTIONS", "GET", "POST"],
         allowCredentials: true,
-        allowOrigins: ["*"],
+        allowOrigins: [
+          "http://localhost:3000",
+          "https://dn1txvkuheft7.cloudfront.net",
+        ],
       },
     });
 
@@ -49,29 +52,43 @@ export class ImportServiceStack extends cdk.Stack {
       license: "Apache-2.0",
       compatibleRuntimes: [
         lambda.Runtime.NODEJS_16_X,
-        lambda.Runtime.NODEJS_18_X,
+      ],
+    });    
+    
+    const csvLayer = new lambda.LayerVersion(this, "csv-layer", {
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "..", "resources", "layers", "csv")
+      ),
+      description: "csv",
+      license: "Apache-2.0",
+      compatibleRuntimes: [
+        lambda.Runtime.NODEJS_16_X,
       ],
     });
 
-    // // To grant usage by other AWS accounts
-    // utilsLayer.addPermission("remote-account-grant", {
-    //   accountId: "*",
-    // });
+    const lambdaProps = {
+      runtime: lambda.Runtime.NODEJS_16_X,
+      environment: {
+        S3_BUCKET_NAME: process.env.S3_BUCKET_NAME!,
+        AWS_RESOURCES_REGION: process.env.AWS_RESOURCES_REGION!,
+      },
+      bundling: {
+        minify: false,
+        externalModules: ["aws-sdk", "csv-parser"],
+      },
+      layers: [utilsLayer, csvLayer],
+    };
 
     // Lambdas
     const importProductsFileLambda = new lambda.Function(
       this,
       "import-products-file-lambda",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        ...lambdaProps,
         handler: "importProductsFile.handler",
         code: lambda.Code.fromAsset(
           path.join(__dirname, "..", "resources", "lambdas")
         ),
-        environment: {
-          S3_BUCKET_NAME: process.env.S3_BUCKET_NAME!,
-        },
-        layers: [utilsLayer],
       }
     );
 
@@ -87,16 +104,11 @@ export class ImportServiceStack extends cdk.Stack {
       this,
       "import-file-parser-lambda",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        ...lambdaProps,
         handler: "importFileParser.handler",
         code: lambda.Code.fromAsset(
           path.join(__dirname, "..", "resources", "lambdas")
         ),
-        environment: {
-          S3_BUCKET_NAME: process.env.S3_BUCKET_NAME!,
-          AWS_RESOURCES_REGION: process.env.AWS_RESOURCES_REGION!,
-        },
-        layers: [utilsLayer],
       }
     );
 
@@ -105,16 +117,20 @@ export class ImportServiceStack extends cdk.Stack {
 
     importFiles.addMethod(
       "GET",
-      new apiGateway.LambdaIntegration(importProductsFileLambda, { proxy: true })
+      new apiGateway.LambdaIntegration(importProductsFileLambda, {
+        proxy: true,
+      })
     );
 
-    // 👇 using methods on the imported bucket
-    importBucket.grantRead(new iam.AccountRootPrincipal());
+    importBucket.grantReadWrite(importProductsFileLambda);
+    importBucket.grantReadWrite(importFileParserLambda);
+    importBucket.grantDelete(importFileParserLambda);
+    importBucket.grantPut(importFileParserLambda);
 
     importBucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
       new s3notifications.LambdaDestination(importFileParserLambda),
-      { prefix: "uploaded/*" }
+      { prefix: "uploaded/" }
     );
   }
 }

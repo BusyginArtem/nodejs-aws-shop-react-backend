@@ -1,5 +1,6 @@
 {
   "ImportServiceStack": {
-    "ImportProductsFileLambdaUrl": "https://5gsz6illnjlvtatdeitkyuetrm0cjcrv.lambda-url.eu-west-1.on.aws/"
+    "ImportApiEndpointD68DD113": "https://4ke0s6n0c8.execute-api.eu-west-1.amazonaws.com/dev/",
+    "apiUrl": "https://4ke0s6n0c8.execute-api.eu-west-1.amazonaws.com/dev/"
   }
 }
