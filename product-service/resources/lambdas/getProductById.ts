@@ -1,10 +1,11 @@
-import { QueryCommand } from "@aws-sdk/client-dynamodb";
+import * as AWS from "aws-sdk";
+import { Handler } from "aws-lambda";
 //
 import { buildResponse, logRequestArguments } from "/opt/utils";
-import { dbClient } from "/opt/db";
-// import { Product, Stock } from "./interfaces";
 
-export const handler = async ({ pathParameters }: any) => {
+const dynamo = new AWS.DynamoDB.DocumentClient();
+
+export const handler: Handler = async ({ pathParameters }: any) => {
   try {
     logRequestArguments(pathParameters);
 
@@ -17,46 +18,33 @@ export const handler = async ({ pathParameters }: any) => {
     }
 
     const productTable = {
-      TableName: process.env!.PRODUCTS_TABLE,
+      TableName: process.env.PRODUCTS_TABLE!,
       KeyConditionExpression: "id = :id",
       ExpressionAttributeValues: {
-        ":id": { S: productId },
+        ":id": productId,
       },
     };
 
     const stockTable = {
-      TableName: process.env!.STOCKS_TABLE,
+      TableName: process.env.STOCKS_TABLE!,
       KeyConditionExpression: "product_id = :id",
       ExpressionAttributeValues: {
-        ":id": { S: productId },
+        ":id": productId,
       },
     };
 
-    const productCommand = new QueryCommand(productTable);
-    const stockCommand = new QueryCommand(stockTable);
+    const { Items: products } = await dynamo.query(productTable).promise();
+    const { Items: stocks } = await dynamo.query(stockTable).promise();
 
-    const { Items: products = [] } = await dbClient.send(productCommand);
-    const { Items: stocks = [] } = await dbClient.send(stockCommand);
-
-    if (!products.length) {
+    if (!products?.length) {
       return buildResponse(404, {
         message: "Product not found!",
       });
     }
 
-    const {
-      id: { S: id },
-      title: { S: title },
-      description: { S: description },
-      price: { N: price },
-    } = products[0];
-
     return buildResponse(200, {
-      id: id,
-      title: title,
-      description: description,
-      price: price,
-      ...{ count: Number(stocks?.[0].count.N) ?? 0 },
+      ...products![0],
+      ...stocks![0],
     });
   } catch (error: any) {
     return buildResponse(500, {

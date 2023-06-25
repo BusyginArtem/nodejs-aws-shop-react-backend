@@ -1,7 +1,10 @@
+import * as AWS from "aws-sdk";
+import { randomUUID } from "crypto";
 import { Handler, SQSEvent } from "aws-lambda";
 import { SNS } from "aws-sdk";
 import { error } from "console";
 
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 const sns = new SNS();
 
 export const handler: Handler = async (event: SQSEvent) => {
@@ -11,24 +14,48 @@ export const handler: Handler = async (event: SQSEvent) => {
     for (const record of records) {
       console.log("Record: %j", record);
 
-      let input = JSON.parse(record.body);
+      const { description, price, title, count } = JSON.parse(record.body);
 
-      if (!input.title || !input.description || !input.count || !input.price) {
+      if (!title || !description || !count || !price) {
         console.error("Incorrect input values");
         throw error;
       }
+
+      const id = randomUUID();
+
+      await dynamodb
+        .transactWrite({
+          TransactItems: [
+            {
+              Put: {
+                TableName: process.env.PRODUCTS_TABLE!,
+                Item: {
+                  id,
+                  description,
+                  price,
+                  title,
+                },
+              },
+            },
+            {
+              Put: {
+                TableName: process.env.STOCKS_TABLE!,
+                Item: {
+                  product_id: id,
+                  count,
+                },
+              },
+            },
+          ],
+        })
+        .promise();
     }
 
     await sns
       .publish({
         Subject: "New files were added to catalog!",
-        Message: JSON.stringify({ test: "test" }),
+        Message: JSON.stringify({ count: records.length }),
         TopicArn: process.env.SNS_TOPIC_ARN!,
-        MessageAttributes: {
-          count: {
-            DataType: "Number",
-          },
-        },
       })
       .promise();
   } catch (error: any) {

@@ -18,13 +18,13 @@ export class ProductServiceStack extends cdk.Stack {
     const productsTable = dynamoDB.Table.fromTableArn(
       this,
       process.env.PRODUCTS_TABLE!,
-      process.env.PRODUCTS_TABLE_ARN!,
+      process.env.PRODUCTS_TABLE_ARN!
     );
 
     const stocksTable = dynamoDB.Table.fromTableArn(
       this,
       process.env.STOCKS_TABLE!,
-      process.env.STOCKS_TABLE_ARN!,
+      process.env.STOCKS_TABLE_ARN!
     );
 
     const api = new apiGateway.RestApi(this, "ProductApi", {
@@ -41,7 +41,10 @@ export class ProductServiceStack extends cdk.Stack {
         ],
         allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
         allowCredentials: true,
-        allowOrigins: ["*"],
+        allowOrigins: [
+          "http://localhost:3000",
+          "https://dn1txvkuheft7.cloudfront.net",
+        ],
       },
     });
 
@@ -59,22 +62,19 @@ export class ProductServiceStack extends cdk.Stack {
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
 
     // Lambda layers
-    const dbLayer = new lambda.LayerVersion(this, "DBLayer", {
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "..", "resources", "layers", "db")
-      ),
-      description: "dynamo-db",
-      license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-        lambda.Runtime.NODEJS_18_X,
-      ],
-    });
+    // const dbLayer = new lambda.LayerVersion(this, "DBLayer", {
+    //   code: lambda.Code.fromAsset(
+    //     path.join(__dirname, "..", "resources", "layers", "db")
+    //   ),
+    //   description: "dynamo-db",
+    //   license: "Apache-2.0",
+    //   compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
+    // });
 
-    // To grant usage by other AWS accounts
-    dbLayer.addPermission("remote-account-grant", {
-      accountId: "*",
-    });
+    // // To grant usage by other AWS accounts
+    // dbLayer.addPermission("remote-account-grant", {
+    //   accountId: "*",
+    // });
 
     const utilsLayer = new lambda.LayerVersion(this, "UtilsLayer", {
       code: lambda.Code.fromAsset(
@@ -82,10 +82,7 @@ export class ProductServiceStack extends cdk.Stack {
       ),
       description: "utils",
       license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-        lambda.Runtime.NODEJS_18_X,
-      ],
+      compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
     });
 
     // To grant usage by other AWS accounts
@@ -94,55 +91,45 @@ export class ProductServiceStack extends cdk.Stack {
     });
 
     const lambdaProps = {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_16_X,
       bundling: {
         minify: false,
         externalModules: ["aws-sdk"],
       },
-      layers: [utilsLayer, dbLayer],
+      layers: [utilsLayer],
+      environment: {
+        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+        STOCKS_TABLE: process.env.STOCKS_TABLE!,
+        SNS_TOPIC_ARN: importProductTopic.topicArn,
+      },
     };
 
     // Lambdas
     const getProductsLambda = new lambda.Function(this, "GetProductsLambda", {
-      runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductList.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
-      environment: {
-        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
-        STOCKS_TABLE: process.env.STOCKS!,
-      },
-      layers: [dbLayer, utilsLayer],
+      ...lambdaProps,
     });
 
     const getProductLambda = new lambda.Function(this, "GetProductLambda", {
-      runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductById.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
-      environment: {
-        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
-        STOCKS_TABLE: process.env.STOCKS!,
-      },
-      layers: [dbLayer, utilsLayer],
+      ...lambdaProps,
     });
 
     const createProductLambda = new lambda.Function(
       this,
       "CreateProductlambda",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        ...lambdaProps,
         handler: "createProduct.handler",
         code: lambda.Code.fromAsset(
           path.join(__dirname, "..", "resources", "lambdas")
         ),
-        environment: {
-          PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
-          STOCKS_TABLE: process.env.STOCKS!,
-        },
-        layers: [dbLayer, utilsLayer],
       }
     );
 
@@ -154,9 +141,6 @@ export class ProductServiceStack extends cdk.Stack {
         code: lambda.Code.fromAsset(
           path.join(__dirname, "..", "resources", "lambdas")
         ),
-        environment: {
-          SNS_TOPIC_ARN: importProductTopic.topicArn,
-        },
         ...lambdaProps,
       }
     );
