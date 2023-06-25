@@ -3,10 +3,13 @@ import { Construct } from "constructs";
 import * as apiGateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamoDB from "aws-cdk-lib/aws-dynamodb";
-// import * as dotenv from "dotenv";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as dotenv from "dotenv";
 import * as path from "path";
+import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 
-// dotenv.config();
+dotenv.config();
 
 export class ProductServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -14,14 +17,14 @@ export class ProductServiceStack extends cdk.Stack {
 
     const productsTable = dynamoDB.Table.fromTableArn(
       this,
-      "Products",
-      "arn:aws:dynamodb:eu-west-1:340814386691:table/Products"
+      process.env.PRODUCTS_TABLE!,
+      process.env.PRODUCTS_TABLE_ARN!,
     );
 
     const stocksTable = dynamoDB.Table.fromTableArn(
       this,
-      "Stocks",
-      "arn:aws:dynamodb:eu-west-1:340814386691:table/Stocks"
+      process.env.STOCKS_TABLE!,
+      process.env.STOCKS_TABLE_ARN!,
     );
 
     const api = new apiGateway.RestApi(this, "ProductApi", {
@@ -42,10 +45,21 @@ export class ProductServiceStack extends cdk.Stack {
       },
     });
 
+    const importProductTopic = new sns.Topic(this, "ImportProductTopic", {
+      topicName: "ImportProductTopic",
+    });
+
+    const importQueue = new sqs.Queue(this, "CatalogItemsQueue", {
+      queueName: "CatalogItemsQueue",
+      retentionPeriod: cdk.Duration.hours(1),
+      receiveMessageWaitTime: cdk.Duration.seconds(20),
+      visibilityTimeout: cdk.Duration.seconds(30),
+    });
+
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
 
     // Lambda layers
-    const dbLayer = new lambda.LayerVersion(this, "db-layer", {
+    const dbLayer = new lambda.LayerVersion(this, "DBLayer", {
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "layers", "db")
       ),
@@ -62,7 +76,7 @@ export class ProductServiceStack extends cdk.Stack {
       accountId: "*",
     });
 
-    const utilsLayer = new lambda.LayerVersion(this, "utils-layer", {
+    const utilsLayer = new lambda.LayerVersion(this, "UtilsLayer", {
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "layers", "utils")
       ),
@@ -79,36 +93,45 @@ export class ProductServiceStack extends cdk.Stack {
       accountId: "*",
     });
 
+    const lambdaProps = {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      bundling: {
+        minify: false,
+        externalModules: ["aws-sdk"],
+      },
+      layers: [utilsLayer, dbLayer],
+    };
+
     // Lambdas
-    const getProductsLambda = new lambda.Function(this, "get-products-lambda", {
+    const getProductsLambda = new lambda.Function(this, "GetProductsLambda", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductList.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
       environment: {
-        PRODUCTS_TABLE: "Products",
-        STOCKS_TABLE: "Stocks",
+        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+        STOCKS_TABLE: process.env.STOCKS!,
       },
       layers: [dbLayer, utilsLayer],
     });
 
-    const getProductLambda = new lambda.Function(this, "get-product-lambda", {
+    const getProductLambda = new lambda.Function(this, "GetProductLambda", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getProductById.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
       environment: {
-        PRODUCTS_TABLE: "Products",
-        STOCKS_TABLE: "Stocks",
+        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+        STOCKS_TABLE: process.env.STOCKS!,
       },
       layers: [dbLayer, utilsLayer],
     });
 
     const createProductLambda = new lambda.Function(
       this,
-      "create-product-lambda",
+      "CreateProductlambda",
       {
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: "createProduct.handler",
@@ -116,11 +139,37 @@ export class ProductServiceStack extends cdk.Stack {
           path.join(__dirname, "..", "resources", "lambdas")
         ),
         environment: {
-          PRODUCTS_TABLE: "Products",
-          STOCKS_TABLE: "Stocks",
+          PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+          STOCKS_TABLE: process.env.STOCKS!,
         },
         layers: [dbLayer, utilsLayer],
       }
+    );
+
+    const catalogBatchProcessLambda = new lambda.Function(
+      this,
+      "CatalogBatchProcessLambda",
+      {
+        handler: "catalogBatchProcess.handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "..", "resources", "lambdas")
+        ),
+        environment: {
+          SNS_TOPIC_ARN: importProductTopic.topicArn,
+        },
+        ...lambdaProps,
+      }
+    );
+
+    new sns.Subscription(this, "StockSubscription", {
+      endpoint: process.env.SUBSCRIPTION_EMAIL!,
+      protocol: sns.SubscriptionProtocol.EMAIL,
+      topic: importProductTopic,
+    });
+
+    importProductTopic.grantPublish(catalogBatchProcessLambda);
+    catalogBatchProcessLambda.addEventSource(
+      new SqsEventSource(importQueue, { batchSize: 5 })
     );
 
     // Routes

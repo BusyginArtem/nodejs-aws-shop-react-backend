@@ -2,7 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as apiGateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as iam from "aws-cdk-lib/aws-iam";
+import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3notifications from "aws-cdk-lib/aws-s3-notifications";
 import * as dotenv from "dotenv";
@@ -42,6 +42,12 @@ export class ImportServiceStack extends cdk.Stack {
       "importBucket",
       process.env.S3_BUCKET_NAME!
     );
+ 
+    const queue = sqs.Queue.fromQueueArn(
+      this,
+      "CatalogItemsQueue",
+      process.env.SQS_ARN!
+    );
 
     // Lambda layers
     const utilsLayer = new lambda.LayerVersion(this, "utils-layer", {
@@ -50,20 +56,16 @@ export class ImportServiceStack extends cdk.Stack {
       ),
       description: "utils",
       license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-      ],
-    });    
-    
+      compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
+    });
+
     const csvLayer = new lambda.LayerVersion(this, "csv-layer", {
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "layers", "csv")
       ),
       description: "csv",
       license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-      ],
+      compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
     });
 
     const lambdaProps = {
@@ -71,6 +73,7 @@ export class ImportServiceStack extends cdk.Stack {
       environment: {
         S3_BUCKET_NAME: process.env.S3_BUCKET_NAME!,
         AWS_RESOURCES_REGION: process.env.AWS_RESOURCES_REGION!,
+        IMPORT_SQS_URL: queue.queueUrl,
       },
       bundling: {
         minify: false,
@@ -92,14 +95,6 @@ export class ImportServiceStack extends cdk.Stack {
       }
     );
 
-    // // Defines the function url for the AWS Lambda
-    // const importProductsFileLambdaUrl = importProductsFileLambda.addFunctionUrl({
-    //   authType: lambda.FunctionUrlAuthType.NONE,
-    // });
-
-    // // print the function url after deployment
-    // new cdk.CfnOutput(this, "ImportProductsFileLambdaUrl", { value: importProductsFileLambdaUrl.url });
-
     const importFileParserLambda = new lambda.Function(
       this,
       "import-file-parser-lambda",
@@ -111,6 +106,8 @@ export class ImportServiceStack extends cdk.Stack {
         ),
       }
     );
+
+    queue.grantSendMessages(importFileParserLambda);
 
     // Routes
     const importFiles = api.root.addResource("import");

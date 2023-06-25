@@ -1,6 +1,6 @@
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
-/* eslint-disable import/extensions, import/no-absolute-path */
+import { Handler } from "aws-cdk-lib/aws-lambda";
 import { dbClient } from "/opt/db";
 import {
   areArgumentsInvalid,
@@ -8,7 +8,7 @@ import {
   logRequestArguments,
 } from "/opt/utils";
 
-export const handler = async (event: any) => {
+export const handler: Handler = async (event: any) => {
   try {
     logRequestArguments(event.body);
 
