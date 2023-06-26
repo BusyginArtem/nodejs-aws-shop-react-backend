@@ -5,6 +5,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamoDB from "aws-cdk-lib/aws-dynamodb";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as sns from "aws-cdk-lib/aws-sns";
+import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
@@ -48,8 +49,8 @@ export class ProductServiceStack extends cdk.Stack {
       },
     });
 
-    const importProductTopic = new sns.Topic(this, "ImportProductTopic", {
-      topicName: "ImportProductTopic",
+    const createProductTopic = new sns.Topic(this, "CreateProductTopic", {
+      topicName: "CreateProductTopic",
     });
 
     const importQueue = new sqs.Queue(this, "CatalogItemsQueue", {
@@ -60,21 +61,6 @@ export class ProductServiceStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
-
-    // Lambda layers
-    // const dbLayer = new lambda.LayerVersion(this, "DBLayer", {
-    //   code: lambda.Code.fromAsset(
-    //     path.join(__dirname, "..", "resources", "layers", "db")
-    //   ),
-    //   description: "dynamo-db",
-    //   license: "Apache-2.0",
-    //   compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
-    // });
-
-    // // To grant usage by other AWS accounts
-    // dbLayer.addPermission("remote-account-grant", {
-    //   accountId: "*",
-    // });
 
     const utilsLayer = new lambda.LayerVersion(this, "UtilsLayer", {
       code: lambda.Code.fromAsset(
@@ -100,7 +86,7 @@ export class ProductServiceStack extends cdk.Stack {
       environment: {
         PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
         STOCKS_TABLE: process.env.STOCKS_TABLE!,
-        SNS_TOPIC_ARN: importProductTopic.topicArn,
+        SNS_TOPIC_ARN: createProductTopic.topicArn,
       },
     };
 
@@ -148,12 +134,28 @@ export class ProductServiceStack extends cdk.Stack {
     new sns.Subscription(this, "StockSubscription", {
       endpoint: process.env.SUBSCRIPTION_EMAIL!,
       protocol: sns.SubscriptionProtocol.EMAIL,
-      topic: importProductTopic,
+      topic: createProductTopic,
     });
 
-    importProductTopic.grantPublish(catalogBatchProcessLambda);
+    createProductTopic.grantPublish(catalogBatchProcessLambda);
     catalogBatchProcessLambda.addEventSource(
       new SqsEventSource(importQueue, { batchSize: 5 })
+    );
+
+    const filterPolicy = {
+      title: sns.SubscriptionFilter.stringFilter({
+        allowlist: ["Batch processing was finished successfully"],
+      }),
+    };
+
+    createProductTopic.addSubscription(
+      new subs.EmailSubscription(process.env.SUBSCRIPTION_EMAIL!)
+    );
+
+    createProductTopic.addSubscription(
+      new subs.EmailSubscription(process.env.SUBSCRIPTION_EMAIL_FILTER!, {
+        filterPolicy,
+      })
     );
 
     // Routes

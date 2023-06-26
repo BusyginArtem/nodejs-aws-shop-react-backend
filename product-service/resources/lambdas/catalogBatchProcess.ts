@@ -12,12 +12,7 @@ export const handler: Handler = async (event: SQSEvent) => {
     const records = event.Records;
 
     for (const record of records) {
-      console.log("Record: %j", record);
-
       const { description, price, title, count } = JSON.parse(record.body);
-
-      console.log("VALUES: ", description, price, title, count);
-      console.log("TYPES: ", typeof description, typeof price, typeof title, typeof count);
 
       if (!title || !description || !count || !price) {
         console.error("Incorrect input values");
@@ -56,8 +51,8 @@ export const handler: Handler = async (event: SQSEvent) => {
 
     await sns
       .publish({
-        Subject: "New files were added to catalog!",
-        Message: JSON.stringify({ count: records.length }),
+        Subject: "Batch processing was finished successfully.",
+        Message: `New ${records.length} file(s) were added to catalog!`,
         TopicArn: process.env.SNS_TOPIC_ARN!,
       })
       .promise();
