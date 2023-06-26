@@ -17,24 +17,21 @@ export const handler: Handler = async ({ pathParameters }: any) => {
       });
     }
 
-    const productTable = {
+    const { Items: products } = await dynamo.query({
       TableName: process.env.PRODUCTS_TABLE!,
       KeyConditionExpression: "id = :id",
       ExpressionAttributeValues: {
         ":id": productId,
       },
-    };
+    }).promise();
 
-    const stockTable = {
+    const { Items: stocks } = await dynamo.query({
       TableName: process.env.STOCKS_TABLE!,
       KeyConditionExpression: "product_id = :id",
       ExpressionAttributeValues: {
         ":id": productId,
       },
-    };
-
-    const { Items: products } = await dynamo.query(productTable).promise();
-    const { Items: stocks } = await dynamo.query(stockTable).promise();
+    }).promise();
 
     if (!products?.length) {
       return buildResponse(404, {

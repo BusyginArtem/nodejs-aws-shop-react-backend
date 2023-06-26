@@ -183,8 +183,10 @@ export class ProductServiceStack extends cdk.Stack {
     productsTable.grantReadData(getProductsLambda);
     productsTable.grantReadData(getProductLambda);
     productsTable.grantReadWriteData(createProductLambda);
+    productsTable.grantReadWriteData(catalogBatchProcessLambda);
     stocksTable.grantReadData(getProductsLambda);
     stocksTable.grantReadData(getProductLambda);
     stocksTable.grantReadWriteData(createProductLambda);
+    stocksTable.grantReadWriteData(catalogBatchProcessLambda);
   }
 }

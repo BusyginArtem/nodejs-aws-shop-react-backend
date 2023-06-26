@@ -16,6 +16,9 @@ export const handler: Handler = async (event: SQSEvent) => {
 
       const { description, price, title, count } = JSON.parse(record.body);
 
+      console.log("VALUES: ", description, price, title, count);
+      console.log("TYPES: ", typeof description, typeof price, typeof title, typeof count);
+
       if (!title || !description || !count || !price) {
         console.error("Incorrect input values");
         throw error;
@@ -32,7 +35,7 @@ export const handler: Handler = async (event: SQSEvent) => {
                 Item: {
                   id,
                   description,
-                  price,
+                  price: Number(price),
                   title,
                 },
               },
@@ -42,7 +45,7 @@ export const handler: Handler = async (event: SQSEvent) => {
                 TableName: process.env.STOCKS_TABLE!,
                 Item: {
                   product_id: id,
-                  count,
+                  count: Number(count),
                 },
               },
             },

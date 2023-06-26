@@ -22,7 +22,7 @@ export const handler: Handler = async (event: S3Event) => {
 
       await new Promise((resolve) => {
         s3Stream
-          .pipe(csv())
+          .pipe(csv({ separator: "," }))
           .on("data", async (data: any) => {
             const item = {
               MessageBody: JSON.stringify(data),
@@ -34,7 +34,10 @@ export const handler: Handler = async (event: S3Event) => {
                 ...item,
               },
               (error, data) => {
-                console.log("DATA: ", data);
+                console.log("ITEN: ", {
+                  QueueUrl: process.env.IMPORT_SQS_URL!,
+                  ...item,
+                });
 
                 if (error) {
                   console.log("ERROR: ", error);
