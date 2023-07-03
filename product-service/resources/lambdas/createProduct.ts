@@ -1,14 +1,16 @@
-import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
-/* eslint-disable import/extensions, import/no-absolute-path */
-import { dbClient } from "/opt/db";
+import { Handler } from "aws-cdk-lib/aws-lambda";
+import * as AWS from "aws-sdk";
+//
 import {
   areArgumentsInvalid,
   buildResponse,
   logRequestArguments,
 } from "/opt/utils";
 
-export const handler = async (event: any) => {
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+export const handler: Handler = async (event: any) => {
   try {
     logRequestArguments(event.body);
 
@@ -21,37 +23,39 @@ export const handler = async (event: any) => {
     }
 
     const { description, price, title, count } = JSON.parse(event.body);
+
     const id = randomUUID();
 
-    const params = {
-      TransactItems: [
-        {
-          Put: {
-            TableName: process.env!.PRODUCTS_TABLE,
-            Item: {
-              id,
-              description,
-              price,
-              title,
+    await dynamodb
+      .transactWrite({
+        TransactItems: [
+          {
+            Put: {
+              TableName: process.env.PRODUCTS_TABLE!,
+              Item: {
+                id,
+                description,
+                price,
+                title,
+              },
             },
           },
-        },
-        {
-          Put: {
-            TableName: process.env!.STOCKS_TABLE,
-            Item: {
-              product_id: id,
-              count,
+          {
+            Put: {
+              TableName: process.env.STOCKS_TABLE!,
+              Item: {
+                product_id: id,
+                count,
+              },
             },
           },
-        },
-      ],
-    };
+        ],
+      })
+      .promise();
 
-    const command = new TransactWriteCommand(params);
-    await dbClient.send(command);
-
-    return buildResponse(201, {});
+    return buildResponse(201, {
+      message: `Product ${id} was successfully created!`,
+    });
   } catch (error: any) {
     return buildResponse(500, {
       message: error.message,

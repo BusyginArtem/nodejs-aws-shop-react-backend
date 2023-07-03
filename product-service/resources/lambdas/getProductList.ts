@@ -1,23 +1,24 @@
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-/* eslint-disable import/extensions, import/no-absolute-path */
-import { dbClient } from "/opt/db";
+import * as AWS from "aws-sdk";
+import { Handler } from "aws-lambda";
+//
 import { buildResponse } from "/opt/utils";
 
-export const handler = async () => {
+const dynamo = new AWS.DynamoDB.DocumentClient();
+
+const scan = async (table: string) => {  
+  const scanResults = await dynamo
+    .scan({
+      TableName: table!,
+    })
+    .promise();
+
+  return scanResults.Items;
+};
+
+export const handler: Handler = async () => {
   try {
-    const productTable = {
-      TableName: process.env!.PRODUCTS_TABLE,
-    };
-
-    const stockTable = {
-      TableName: process.env!.STOCKS_TABLE,
-    };
-
-    const productCommand = new ScanCommand(productTable);
-    const stockCommand = new ScanCommand(stockTable);
-
-    const { Items: productItems = [] } = await dbClient.send(productCommand);
-    const { Items: stockItems = [] } = await dbClient.send(stockCommand);
+    const productItems = await scan(process.env.PRODUCTS_TABLE!);
+    const stockItems = await scan(process.env.STOCKS_TABLE!);
 
     return buildResponse(
       200,

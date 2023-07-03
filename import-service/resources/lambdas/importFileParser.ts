@@ -1,4 +1,5 @@
 import { Handler, S3Event } from "aws-lambda";
+import * as AWS from "aws-sdk";
 //
 import { buildResponse } from "/opt/utils";
 import * as csv from "csv-parser";
@@ -10,6 +11,8 @@ export const handler: Handler = async (event: S3Event) => {
       const bucketName = record.s3.bucket.name;
       const objectKey = record.s3.object.key;
 
+      const sqs = new AWS.SQS();
+
       const s3Stream = s3Client
         .getObject({
           Bucket: bucketName,
@@ -19,9 +22,30 @@ export const handler: Handler = async (event: S3Event) => {
 
       await new Promise((resolve) => {
         s3Stream
-          .pipe(csv())
-          .on("data", (data: any) => {
-            console.log("DATA: ", data);
+          .pipe(csv({ separator: "," }))
+          .on("data", async (data: any) => {
+            const item = {
+              MessageBody: JSON.stringify(data),
+            };
+
+            await sqs.sendMessage(
+              {
+                QueueUrl: process.env.IMPORT_SQS_URL!,
+                ...item,
+              },
+              (error, data) => {
+                console.log("ITEN: ", {
+                  QueueUrl: process.env.IMPORT_SQS_URL!,
+                  ...item,
+                });
+
+                if (error) {
+                  console.log("ERROR: ", error);
+                } else {
+                  console.log("Message has been delivered successfully!");
+                }
+              }
+            );
           })
           .on("error", (error: any) => console.log("ERROR: ", error))
           .on("end", async () => {

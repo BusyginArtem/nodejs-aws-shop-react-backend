@@ -3,10 +3,14 @@ import { Construct } from "constructs";
 import * as apiGateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamoDB from "aws-cdk-lib/aws-dynamodb";
-// import * as dotenv from "dotenv";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
+import * as dotenv from "dotenv";
 import * as path from "path";
+import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 
-// dotenv.config();
+dotenv.config();
 
 export class ProductServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -14,14 +18,14 @@ export class ProductServiceStack extends cdk.Stack {
 
     const productsTable = dynamoDB.Table.fromTableArn(
       this,
-      "Products",
-      "arn:aws:dynamodb:eu-west-1:340814386691:table/Products"
+      process.env.PRODUCTS_TABLE!,
+      process.env.PRODUCTS_TABLE_ARN!
     );
 
     const stocksTable = dynamoDB.Table.fromTableArn(
       this,
-      "Stocks",
-      "arn:aws:dynamodb:eu-west-1:340814386691:table/Stocks"
+      process.env.STOCKS_TABLE!,
+      process.env.STOCKS_TABLE_ARN!
     );
 
     const api = new apiGateway.RestApi(this, "ProductApi", {
@@ -38,40 +42,33 @@ export class ProductServiceStack extends cdk.Stack {
         ],
         allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
         allowCredentials: true,
-        allowOrigins: ["*"],
+        allowOrigins: [
+          "http://localhost:3000",
+          "https://dn1txvkuheft7.cloudfront.net",
+        ],
       },
+    });
+
+    const createProductTopic = new sns.Topic(this, "CreateProductTopic", {
+      topicName: "CreateProductTopic",
+    });
+
+    const importQueue = new sqs.Queue(this, "CatalogItemsQueue", {
+      queueName: "CatalogItemsQueue",
+      retentionPeriod: cdk.Duration.hours(1),
+      receiveMessageWaitTime: cdk.Duration.seconds(20),
+      visibilityTimeout: cdk.Duration.seconds(30),
     });
 
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
 
-    // Lambda layers
-    const dbLayer = new lambda.LayerVersion(this, "db-layer", {
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "..", "resources", "layers", "db")
-      ),
-      description: "dynamo-db",
-      license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-        lambda.Runtime.NODEJS_18_X,
-      ],
-    });
-
-    // To grant usage by other AWS accounts
-    dbLayer.addPermission("remote-account-grant", {
-      accountId: "*",
-    });
-
-    const utilsLayer = new lambda.LayerVersion(this, "utils-layer", {
+    const utilsLayer = new lambda.LayerVersion(this, "UtilsLayer", {
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "layers", "utils")
       ),
       description: "utils",
       license: "Apache-2.0",
-      compatibleRuntimes: [
-        lambda.Runtime.NODEJS_16_X,
-        lambda.Runtime.NODEJS_18_X,
-      ],
+      compatibleRuntimes: [lambda.Runtime.NODEJS_16_X],
     });
 
     // To grant usage by other AWS accounts
@@ -79,48 +76,86 @@ export class ProductServiceStack extends cdk.Stack {
       accountId: "*",
     });
 
+    const lambdaProps = {
+      runtime: lambda.Runtime.NODEJS_16_X,
+      bundling: {
+        minify: false,
+        externalModules: ["aws-sdk"],
+      },
+      layers: [utilsLayer],
+      environment: {
+        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+        STOCKS_TABLE: process.env.STOCKS_TABLE!,
+        SNS_TOPIC_ARN: createProductTopic.topicArn,
+      },
+    };
+
     // Lambdas
-    const getProductsLambda = new lambda.Function(this, "get-products-lambda", {
-      runtime: lambda.Runtime.NODEJS_18_X,
+    const getProductsLambda = new lambda.Function(this, "GetProductsLambda", {
       handler: "getProductList.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
-      environment: {
-        PRODUCTS_TABLE: "Products",
-        STOCKS_TABLE: "Stocks",
-      },
-      layers: [dbLayer, utilsLayer],
+      ...lambdaProps,
     });
 
-    const getProductLambda = new lambda.Function(this, "get-product-lambda", {
-      runtime: lambda.Runtime.NODEJS_18_X,
+    const getProductLambda = new lambda.Function(this, "GetProductLambda", {
       handler: "getProductById.handler",
       code: lambda.Code.fromAsset(
         path.join(__dirname, "..", "resources", "lambdas")
       ),
-      environment: {
-        PRODUCTS_TABLE: "Products",
-        STOCKS_TABLE: "Stocks",
-      },
-      layers: [dbLayer, utilsLayer],
+      ...lambdaProps,
     });
 
     const createProductLambda = new lambda.Function(
       this,
-      "create-product-lambda",
+      "CreateProductlambda",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        ...lambdaProps,
         handler: "createProduct.handler",
         code: lambda.Code.fromAsset(
           path.join(__dirname, "..", "resources", "lambdas")
         ),
-        environment: {
-          PRODUCTS_TABLE: "Products",
-          STOCKS_TABLE: "Stocks",
-        },
-        layers: [dbLayer, utilsLayer],
       }
+    );
+
+    const catalogBatchProcessLambda = new lambda.Function(
+      this,
+      "CatalogBatchProcessLambda",
+      {
+        handler: "catalogBatchProcess.handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "..", "resources", "lambdas")
+        ),
+        ...lambdaProps,
+      }
+    );
+
+    new sns.Subscription(this, "StockSubscription", {
+      endpoint: process.env.SUBSCRIPTION_EMAIL!,
+      protocol: sns.SubscriptionProtocol.EMAIL,
+      topic: createProductTopic,
+    });
+
+    createProductTopic.grantPublish(catalogBatchProcessLambda);
+    catalogBatchProcessLambda.addEventSource(
+      new SqsEventSource(importQueue, { batchSize: 5 })
+    );
+
+    const filterPolicy = {
+      title: sns.SubscriptionFilter.stringFilter({
+        allowlist: ["Batch processing was finished successfully"],
+      }),
+    };
+
+    createProductTopic.addSubscription(
+      new subs.EmailSubscription(process.env.SUBSCRIPTION_EMAIL!)
+    );
+
+    createProductTopic.addSubscription(
+      new subs.EmailSubscription(process.env.SUBSCRIPTION_EMAIL_FILTER!, {
+        filterPolicy,
+      })
     );
 
     // Routes
@@ -150,8 +185,10 @@ export class ProductServiceStack extends cdk.Stack {
     productsTable.grantReadData(getProductsLambda);
     productsTable.grantReadData(getProductLambda);
     productsTable.grantReadWriteData(createProductLambda);
+    productsTable.grantReadWriteData(catalogBatchProcessLambda);
     stocksTable.grantReadData(getProductsLambda);
     stocksTable.grantReadData(getProductLambda);
     stocksTable.grantReadWriteData(createProductLambda);
+    stocksTable.grantReadWriteData(catalogBatchProcessLambda);
   }
 }
