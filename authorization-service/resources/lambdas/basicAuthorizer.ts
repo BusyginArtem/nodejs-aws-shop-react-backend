@@ -1,23 +1,24 @@
 import {
-  Context,
   Handler,
-  Callback,
   APIGatewayAuthorizerResult,
   APIGatewayRequestAuthorizerEvent,
 } from "aws-lambda";
-import * as dotenv from "dotenv";
 
-dotenv.config();
-
-const getPassword = (login: string) => {
-  const password = process.env[login];
-  console.log("[LOGIN]: ", login)
-  console.log("[PASSWORD]: ", password)
-  if (!password) {
-    return "";
+const validateCredentials = (login: string, password: string) => {
+  console.log("[LOGIN]: ", login);
+  console.log("[PASSWORD]: ", password);
+  if (!password || !login) {
+    return false;
   }
 
-  return password;
+  if (
+    login !== process.env.GITHUB_ACCOUNT_LOGIN ||
+    password !== process.env.TEST_PASSWORD
+  ) {
+    return false;
+  }
+
+  return true;
 };
 
 const generatePolicy = (
@@ -41,45 +42,27 @@ const generatePolicy = (
 };
 
 export const handler: Handler = async (
-  event: APIGatewayRequestAuthorizerEvent,
-  context: Context,
-  callback: Callback
+  event: APIGatewayRequestAuthorizerEvent
 ) => {
   try {
     const token = event!.headers!.Authorization;
-    console.log("[TOKEN]: ", token)
-    if (!token) {
-      // callback("Unauthorized");
+    console.log("[TOKEN]: ", token);
 
-      // return;
-      return {
-        headers:{
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Credentials': true,
-          'Access-Control-Allow-Headers': ['Authorization', 'Content-Type']
-        },
-        statusCode:401,
-        body:JSON.stringify('Unauthorized'),
-      }
+    if (!token) {
+      return generatePolicy("*", "Deny", event.methodArn);
     }
 
-    const [login, password] = Buffer.from(token!, "base64")
-      .toString()
+    const [, credentials] = token!.split(" ");
+    const [login, password] = Buffer.from(credentials!, "base64")
+      .toString("utf-8")
       .split(":");
 
-    const storedPassword = getPassword(login);
-
-    if (storedPassword !== password) {
-      callback(null, generatePolicy("*", "Deny", event.methodArn));
-
-      return;
+    if (!validateCredentials(login, password)) {
+      return generatePolicy("*", "Deny", event.methodArn);
     }
 
-    callback(
-      null,
-      generatePolicy("apigateway.amazonaws.com", "Allow", event.methodArn)
-    );
+    return generatePolicy("apigateway.amazonaws.com", "Allow", event.methodArn);
   } catch (error) {
-    callback(null, generatePolicy("*", "Deny", event.methodArn));
+    return generatePolicy("*", "Deny", event.methodArn);
   }
 };
