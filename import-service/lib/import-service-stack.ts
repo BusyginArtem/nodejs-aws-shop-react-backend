@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as apiGateway from "aws-cdk-lib/aws-apigateway";
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -9,6 +10,12 @@ import * as dotenv from "dotenv";
 import * as path from "path";
 
 dotenv.config();
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': "'*'",
+  'Access-Control-Allow-Headers': "'*'",
+  'Access-Control-Allow-Methods': "'GET'",
+};
 
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -20,19 +27,21 @@ export class ImportServiceStack extends cdk.Stack {
         stageName: "dev",
       },
       defaultCorsPreflightOptions: {
-        allowHeaders: [
-          "Content-Type",
-          "X-Amz-Date",
-          "Authorization",
-          "X-Api-Key",
-        ],
-        allowMethods: ["OPTIONS", "GET", "POST"],
+        allowHeaders: ["*"],
+        allowOrigins: apiGateway.Cors.ALL_ORIGINS,
+        allowMethods: apiGateway.Cors.ALL_METHODS,
         allowCredentials: true,
-        allowOrigins: [
-          "http://localhost:3000",
-          "https://dn1txvkuheft7.cloudfront.net",
-        ],
       },
+    });
+
+    api.addGatewayResponse("UNAUTHORIZED_API_RESPONSE", {
+      type: apiGateway.ResponseType.UNAUTHORIZED,
+      responseHeaders: CORS_HEADERS
+    });
+
+    api.addGatewayResponse("ACCESS_DENIED_API_RESPONSE", {
+      type: apiGateway.ResponseType.ACCESS_DENIED,
+      responseHeaders: CORS_HEADERS
     });
 
     new cdk.CfnOutput(this, "apiUrl", { value: api.url });
@@ -42,7 +51,7 @@ export class ImportServiceStack extends cdk.Stack {
       "importBucket",
       process.env.S3_BUCKET_NAME!
     );
- 
+
     const queue = sqs.Queue.fromQueueArn(
       this,
       "CatalogItemsQueue",
@@ -109,6 +118,22 @@ export class ImportServiceStack extends cdk.Stack {
 
     queue.grantSendMessages(importFileParserLambda);
 
+    const basicAuthorizerLambda = lambda.Function.fromFunctionArn(
+      this,
+      "basicAuthorizerFromArn",
+      process.env.AUTH_LAMBDA_ARN!
+    );    
+
+    const authorizer = new apiGateway.RequestAuthorizer(
+      this,
+      "BasicAuthorizer",
+      {
+        authorizerName: "BasicAuthorizer",
+        handler: basicAuthorizerLambda,
+        identitySources: [apiGateway.IdentitySource.header('Authorization')],
+      }
+    );
+
     // Routes
     const importFiles = api.root.addResource("import");
 
@@ -116,7 +141,17 @@ export class ImportServiceStack extends cdk.Stack {
       "GET",
       new apiGateway.LambdaIntegration(importProductsFileLambda, {
         proxy: true,
-      })
+      }),
+      {
+        authorizer,
+        authorizationType: apiGateway.AuthorizationType.CUSTOM,
+        requestParameters: {
+          "method.request.querystring.name": true,
+        },
+        requestValidatorOptions: {
+          validateRequestParameters: true,
+        },
+      }
     );
 
     importBucket.grantReadWrite(importProductsFileLambda);
