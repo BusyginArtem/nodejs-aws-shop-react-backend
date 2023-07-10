@@ -30,6 +30,7 @@ export const handler: Handler = async (
   } catch (error: any) {
     return buildResponse(500, {
       message: error.message,
+      error: error,
     });
   }
 };
